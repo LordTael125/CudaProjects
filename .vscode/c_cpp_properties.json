@@ -1,0 +1,27 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+
+                // CUDA includes
+                "/opt/cuda/include",
+
+                // GLFW includes
+                "/usr/include",
+
+                // Vulkan includes (typically under Vulkan SDK or system includes)
+                "/usr/include/vulkan"
+            ],
+            "defines": [
+                "__CUDACC__"  // Helps IntelliSense understand CUDA keywords
+            ],
+            "compilerPath": "/usr/bin/clang++",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-clang-x64"
+        }
+    ],
+    "version": 4
+}

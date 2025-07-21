@@ -1,0 +1,49 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build CUDA Program (Clang)",
+            "type": "cppbuild",
+            "command": "/usr/bin/clang++",
+            "args": [
+                "--cuda-path=/opt/cuda",
+                "--cuda-gpu-arch=sm_86",
+                "-fdiagnostics-color=always",
+                "-g",
+                "${file}",
+                "-o",
+                "${fileDirname}/.temp/${fileBasenameNoExtension}",
+                "-I/opt/cuda/include",
+                "-L/opt/cuda/lib64",
+                "-lcudart",
+                "-lglfw",
+                "-lGL",
+                "-ldl",
+                "-lpthread",
+                "-lm"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": ["$gcc"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "CUDA build task using Clang."
+        },
+        {
+            "label": "Run CUDA Program",
+            "type": "shell",
+            "command": "kitty",
+            "args": [
+                "--",
+                "/bin/bash",
+                "-c",
+                "${fileDirname}/.temp/${fileBasenameNoExtension}; exec bash"
+            ],
+            "group": "none",
+            "problemMatcher": []
+        }
+    ]
+}

@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run CUDA Program",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${fileDirname}/.temp/${fileBasenameNoExtension}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [
+                { "name": "LD_LIBRARY_PATH", "value": "/opt/cuda/lib64:$LD_LIBRARY_PATH" },
+                { "name": "PATH", "value": "/opt/cuda/bin:$PATH" }
+            ],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "miDebuggerPath": "/usr/bin/lldb-mi",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for LLDB",
+                    "text": "settings set target.pretty-printing true",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build CUDA Program (Clang)"
+        }
+    ]
+}
