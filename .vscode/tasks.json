@@ -4,11 +4,8 @@
         {
             "label": "Build CUDA Program (Clang)",
             "type": "cppbuild",
-            "command": "/usr/bin/clang++",
+            "command": "/opt/cuda/bin/nvcc",
             "args": [
-                "--cuda-path=/opt/cuda",
-                "--cuda-gpu-arch=sm_86",
-                "-fdiagnostics-color=always",
                 "-g",
                 "${file}",
                 "-o",
