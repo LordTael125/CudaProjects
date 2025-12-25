@@ -1,9 +1,7 @@
 #include <stdio.h>
-#include <ctime>
 #include <cuda_runtime.h>
 #include <cuda_profiler_api.h>
-#include <curand_kernel.h>
-
+#include <math.h>
 
 // Macro for checking CUDA errors
 #define CHECK_CUDA_ERROR(call)                                      \
@@ -18,104 +16,70 @@
 
 
 
-struct bodyCar{
-    float3 pos;
-    float3 vel;
-} typedef bodyCar;
+
+void genValue(float *a, int len, float mod)
+{
+    float gen = 0.0;
+    for (int x = 0; x < len; x++){
+	    for (int y = 0; y < len; y++){
+        	gen = mod + x*y +  len/mod*y;
+			a[x * len + y]=gen;
+			gen=0.0;
+    }}
+};
 
 
-    // A program to simulate total position change over time
-__global__ void moveBody(bodyCar *body, int len, int dt){
+__global__ void addVector(float* A, float* B, float* C,int sz)
+{
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
+	int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < len){
-        body[i].pos.x += body[i].vel.x * dt;
-        body[i].pos.y += body[i].vel.y * dt;
-        body[i].pos.z += body[i].vel.z * dt;
-
-    }
-    
-
+	if (i<sz){
+	C[i] = A[i] + B[i];
+	}
 }
-
-__global__ void initRNG(curandState *states, unsigned long seed){
-
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    curand_init(seed + i, i ,10, &states[i]);
-
-}
-
-__global__ void initCars(bodyCar *body, curandState *states, int len){
-
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if (i < len){
-
-        curandState localstate = states[i];
-
-        body[i].pos.x = curand_uniform(&localstate) * 100.0;
-        body[i].pos.y = curand_uniform(&localstate) * 100.0;
-        body[i].pos.z = curand_uniform(&localstate) * 100.0;
-
-        body[i].vel.x = curand_uniform(&localstate) * 10.0;
-        body[i].vel.y = curand_uniform(&localstate) * 10.0;
-        body[i].vel.z = curand_uniform(&localstate) * 10.0;
-
-        states[i] = localstate;
-
-        if (i < 10) {
-            printf("Generated pos: %f, %f, %f\n", body[i].pos.x, body[i].pos.y, body[i].pos.z);
-        }
-
-    }
-}
-
 
 
 int main(){
 
-    int NUM = 329;
-    int my_time = 5;
-
-    bodyCar Cars[NUM];
-
-    bodyCar *d_body;
-    curandState *d_states;
+	int n = 100;
+	int size = n*n;
 
 
-    
-    CHECK_CUDA_ERROR(cudaMalloc(&d_body, NUM * sizeof(bodyCar)));
-    CHECK_CUDA_ERROR(cudaMalloc(&d_states, NUM * sizeof(curandState)));
+	float h_A[size], h_B[size], h_C[size];
 
-    int ThreadPerBlocks = 128;
-    int BlocksPerGrid = (NUM + ThreadPerBlocks - 1) / ThreadPerBlocks;
+	genValue(h_A, n, 42);
+	genValue(h_B, n, 23);
 
-    initRNG<<< BlocksPerGrid, ThreadPerBlocks>>>(d_states, time(NULL));
-    
-    initCars<<< BlocksPerGrid, ThreadPerBlocks>>>(d_body, d_states, NUM);
-    
-    moveBody<<< BlocksPerGrid, ThreadPerBlocks>>>(d_body, NUM, 45);
-    
-    
-    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-    CHECK_CUDA_ERROR(cudaMemcpy(Cars, d_body, NUM * sizeof(bodyCar), cudaMemcpyDeviceToHost));
+	float *d_A, *d_B, *d_C;
 
+	CHECK_CUDA_ERROR(cudaMalloc((void **)&d_A, size * sizeof(float)));
+	CHECK_CUDA_ERROR(cudaMalloc((void **)&d_B, size * sizeof(float)));
+	CHECK_CUDA_ERROR(cudaMalloc((void **)&d_C, size * sizeof(float)));
 
-    srand(time(NULL));
-    for (int i = 0; i < 10; ++i) {
-        int idx = rand() % 329;
-        printf("pos after 45s - Car[%d].pos.x = %f\n", idx, Cars[idx].pos.x);
-    }
-    
+	CHECK_CUDA_ERROR(cudaMemcpy(d_A, h_A, size * sizeof(float), cudaMemcpyHostToDevice));
+	CHECK_CUDA_ERROR(cudaMemcpy(d_B, h_B, size * sizeof(float), cudaMemcpyHostToDevice));
 
-    printf("pos: %f, %f, %f\n", Cars[0].pos.x, Cars[2].pos.y, Cars[8].pos.z);
+	// Launch the kernel (1 block with n threads in this case)
+	int threadsPerBlock = 256;
+	int blocksPerGrid = (size + threadsPerBlock - 1) / threadsPerBlock;
+	addVector<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, size);
+
+	//CHECK_CUDA_ERROR(cudaGetLastError());
+	CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+
+	CHECK_CUDA_ERROR(cudaMemcpy(h_C, d_C, size * sizeof(float), cudaMemcpyDeviceToHost));
 
 
+    printf("Resultant vector:\n");
+    for (int i = 0; i < 10; i++) {
+		for (int j = 0; j< 10; j++){
+        	printf("i(%d)(%d) \t A(%f) \t + \t B(%f) \t -> \t %f\n", i,j, h_A[i*n+ j], h_B[i *n + j], h_C[i*n +j]);
+    	}
+	}
 
-    cudaFree(d_body);
-    cudaFree(d_states);
 
-    printf("Exec complete");
-    return 0;
+	cudaFree(d_A);
+	cudaFree(d_B);
+	cudaFree(d_C);
 }

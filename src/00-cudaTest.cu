@@ -1,85 +1,69 @@
-#include <stdio.h>
+#include <iostream>
+#include <vector>
 #include <cuda_runtime.h>
-#include <cuda_profiler_api.h>
-#include <math.h>
 
 // Macro for checking CUDA errors
-#define CHECK_CUDA_ERROR(call)                                      \
-    do {                                                            \
-        cudaError_t err = call;                                     \
-        if (err != cudaSuccess) {                                   \
-            fprintf(stderr, "CUDA Error: %s (%s:%d)\n",             \
-                    cudaGetErrorString(err), __FILE__, __LINE__);   \
-            exit(EXIT_FAILURE);                                     \
-        }                                                           \
+#define CHECK_CUDA_ERROR(call)                             \
+    do {                                                   \
+        cudaError_t err = call;                            \
+        if (err != cudaSuccess) {                          \
+            std::cerr << "CUDA Error: " << cudaGetErrorString(err) \
+                      << " (" << __FILE__ << ":" << __LINE__ << ")" << std::endl; \
+            exit(EXIT_FAILURE);                            \
+        }                                                  \
     } while (0)
 
-
-
-
-void genValue(float *a, int len, float mod)
-{
-    float gen = 0.0;
-    for (int x = 0; x < len; x++){
-	    for (int y = 0; y < len; y++){
-        	gen = mod + x*y +  len/mod*y;
-			a[x * len + y]=gen;
-			gen=0.0;
-    }}
-};
-
-
-__global__ void addVector(float* A, float* B, float* C,int sz)
-{
-
-	int i = threadIdx.x + blockIdx.x * blockDim.x;
-
-	if (i<sz){
-	C[i] = A[i] + B[i];
-	}
+// CUDA kernel to add two vectors
+__global__ void addVector(const float* A, const float* B, float* C, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n) {
+        C[i] = A[i] + B[i];
+    }
 }
 
+int main() {
+    // Size of the vectors
+    const int n = 5;
 
-int main(){
+    // Host vectors using std::vector
+    std::vector<float> h_A = {2.54, 3.41, 5.23, 3.345, 7.21};
+    std::vector<float> h_B = {6.32, 3.34, 4.35, 2.21, 1.34};
+    std::vector<float> h_C(n, 0.0f); // Result vector initialized to 0
 
-	int n = 100;
-	int size = n*n;
+    // Device pointers
+    float *d_A, *d_B, *d_C;
 
+    // Allocate memory on the device
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_A, n * sizeof(float)));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_B, n * sizeof(float)));
+    CHECK_CUDA_ERROR(cudaMalloc((void**)&d_C, n * sizeof(float)));
 
-	float h_A[size], h_B[size], h_C[size];
+    // Copy input data from host to device
+    CHECK_CUDA_ERROR(cudaMemcpy(d_A, h_A.data(), n * sizeof(float), cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(d_B, h_B.data(), n * sizeof(float), cudaMemcpyHostToDevice));
 
-	genValue(h_A, n, 42);
-	genValue(h_B, n, 23);
+    // Configure kernel launch parameters
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
 
-	float *d_A, *d_B, *d_C;
+    // Launch the kernel
+    addVector<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, n);
+    CHECK_CUDA_ERROR(cudaGetLastError());
+    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 
-	CHECK_CUDA_ERROR(cudaMalloc((void **)&d_A, size * sizeof(float)));
-	CHECK_CUDA_ERROR(cudaMalloc((void **)&d_B, size * sizeof(float)));
-	CHECK_CUDA_ERROR(cudaMalloc((void **)&d_C, size * sizeof(float)));
+    // Copy the result back to the host
+    CHECK_CUDA_ERROR(cudaMemcpy(h_C.data(), d_C, n * sizeof(float), cudaMemcpyDeviceToHost));
 
-	CHECK_CUDA_ERROR(cudaMemcpy(d_A, h_A, size * sizeof(float), cudaMemcpyHostToDevice));
-	CHECK_CUDA_ERROR(cudaMemcpy(d_B, h_B, size * sizeof(float), cudaMemcpyHostToDevice));
+    // Print the result
+    std::cout << "Resultant vector:" << std::endl;
+    for (const auto& value : h_C) {
+        std::cout << value << std::endl;
+    }
 
-	// Launch the kernel (1 block with n threads in this case)
-	int threadsPerBlock = 256;
-	int blocksPerGrid = (size + threadsPerBlock - 1) / threadsPerBlock;
-	addVector<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, size);
+    // Free device memory
+    CHECK_CUDA_ERROR(cudaFree(d_A));
+    CHECK_CUDA_ERROR(cudaFree(d_B));
+    CHECK_CUDA_ERROR(cudaFree(d_C));
 
-	//CHECK_CUDA_ERROR(cudaGetLastError());
-	CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-
-	CHECK_CUDA_ERROR(cudaMemcpy(h_C, d_C, size * sizeof(float), cudaMemcpyDeviceToHost));
-
-
-    printf("Resultant vector:\n");
-    for (int i = 0; i < 10; i++) {
-		for (int j = 0; j< 10; j++){
-        	printf("i(%d)(%d) \t A(%f) \t + \t B(%f) \t -> \t %f\n", i,j, h_A[i*n+ j], h_B[i *n + j], h_C[i*n +j]);
-    	}
-	}
-
-
-	cudaFree(d_A);
-	cudaFree(d_B);
-	cudaFree(d_C);
+    return 0;
 }
