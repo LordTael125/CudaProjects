@@ -5,14 +5,12 @@
             "includePath": [
                 "${workspaceFolder}/**",
 
-                // CUDA includes
                 "/opt/cuda/include",
 
-                // GLFW includes
                 "/usr/include",
 
-                // Vulkan includes (typically under Vulkan SDK or system includes)
-                "/usr/include/vulkan"
+                "/usr/include/vulkan",
+                "${workspaceFolder}/include"
             ],
             "defines": [
                 "__CUDACC__"  // Helps IntelliSense understand CUDA keywords
